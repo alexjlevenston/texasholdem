@@ -215,7 +215,7 @@ class TexasHoldEm:
     """
     Represents a table of TexasHoldEm (tournament style).
 
-    Instantiate this object with the buyin, big blind, small blind,
+    Instantiate this object with the player chips, big blind, small blind,
     and the number of players.
 
     To interact with this class, call :meth:`TexasHoldEm.start_hand` which will
@@ -225,12 +225,10 @@ class TexasHoldEm:
     execute the given action for the current player.
 
     Arguments:
-        buyin (int): The buyin to register for this game.
+        player_chips (List[int]): The number of chips each player has.
         big_blind (int): Big blind
         small_blind (int): Small blind
-        max_players (int): how many players can sit at the table, defaults to 9.
     Attributes:
-        buyin (int): The buyin to register for this game.
         big_blind (int): Big blind
         small_blind (int): Small blind
         max_players (int): how many players can sit at the table, defaults to 9.
@@ -254,26 +252,32 @@ class TexasHoldEm:
 
     """
 
-    def __init__(self, buyin: int, big_blind: int, small_blind: int, max_players=9, seed: Optional[int] = None):
+    def __init__(self,
+                 big_blind: int,
+                 small_blind: int,
+                 player_chips: List[int],
+                 cards: List[Card],
+                 seed: Optional[int] = None):
         # Local RNG
         self._random = random.Random(seed)
         
-        self.buyin = buyin
         self.big_blind = big_blind
         self.small_blind = small_blind
-        self.max_players = max_players
+        self.max_players = len(player_chips)
 
         self.players: List[Player] = list(
-            Player(i, self.buyin) for i in range(max_players)
+            Player(i, player_chips[i]) for i in range(self.max_players)
         )
 
-        self.btn_loc = random.choice(self.players).player_id
+        self.btn_loc = -1
         self.bb_loc = -1
         self.sb_loc = -1
         self.current_player = -1
 
         self.pots = []
-        self._deck = None
+        self._deck = Deck(self._random)
+        assert len(cards) == 52, "Deck must have 52 cards"
+        self._deck.cards = [copy.deepcopy(card) for card in cards]
         self.board = []
         self.hands = {}
         self.last_raise = 0
@@ -403,7 +407,10 @@ class TexasHoldEm:
         self.pots = [Pot()]
 
         # deal cards
-        self._deck = Deck(self._random)
+        if self.num_hands > 0:
+            self._deck = Deck(self._random)
+        else:
+            assert len(self._deck.cards) == 52, "Deck must have 52 cards"
         self.hands = {}
         self.board = []
 
@@ -1278,181 +1285,3 @@ class TexasHoldEm:
 
         """
         return self.hand_history.export_history(path)
-
-    @staticmethod
-    def import_history(path: Union[str, os.PathLike]) -> Iterator[TexasHoldEm]:
-        """
-        Import a PGN file i.e. as exported from :meth:`export_history()`. Returns an
-        iterator over game states as specified from the history.
-
-        Arguments:
-            path (str | os.PathLike): The PGN file to import from
-        Returns:
-            Iterator[TexasHoldEm]: An iterator over game states such that
-                the next hand will play exactly like from the history.
-        Raises:
-            HistoryImportError: If the file given does not exist or if the file is invalid
-
-        """
-        return TexasHoldEm._import_history(History.import_history(path))
-
-    @staticmethod
-    def _import_history(history: History) -> Iterator[TexasHoldEm]:
-        """
-        Arguments:
-            history (History): The History file to import from
-        Returns:
-            Iterator[TexasHoldEm]: An iterator over game states such that
-                the next hand will play exactly like from the history.
-        Raises:
-            HistoryImportError: If there was an error running the history.
-
-        """
-        # pylint: disable=protected-access
-        num_players = len(history.prehand.player_chips)
-        game = TexasHoldEm(
-            buyin=1,
-            big_blind=history.prehand.big_blind,
-            small_blind=history.prehand.small_blind,
-            max_players=num_players,
-        )
-
-        # button placed right before 0
-        game.btn_loc = num_players - 1
-
-        # read chips
-        for i in game.player_iter(0):
-            game.players[i].chips = history.prehand.player_chips[i]
-
-        # stack deck
-        deck = Deck(game._random)
-        deck.cards = list(history.settle.new_cards)
-
-        # player actions in a stack
-        player_actions: List[Tuple[int, ActionType, Optional[int]]] = []
-        for bet_round in (history.river, history.turn, history.flop, history.preflop):
-            if bet_round:
-                deck.cards = bet_round.new_cards + deck.cards
-                for action in reversed(bet_round.actions):
-                    player_actions.insert(
-                        0, (action.player_id, action.action_type, action.total)
-                    )
-
-        # start hand (deck will deal)
-        game.start_hand()
-
-        # give players old cards
-        for i in game.player_iter():
-            game.hands[i] = history.prehand.player_cards[i]
-
-        # swap decks
-        game._deck = deck
-
-        while game.is_hand_running():
-            yield game
-
-            try:
-                player_id, action, total = player_actions.pop(0)
-            except IndexError as err:
-                raise HistoryImportError(
-                    "Expected more actions than given in the history file."
-                ) from err
-
-            if player_id != game.current_player:
-                raise HistoryImportError(
-                    f"Error replaying history: action player {player_id} "
-                    f"is not current player {game.current_player}"
-                )
-
-            game.take_action(action, total=total)
-        yield game
-
-    def copy(self, shuffle: bool = True):
-        """
-        Arguments:
-            shuffle (bool): Shuffle the deck, defaults to true.
-        Returns:
-            TexasHoldEm: A copy of the game.
-
-        """
-        # pylint: disable=protected-access
-        game = TexasHoldEm(
-            buyin=self.buyin,
-            big_blind=self.big_blind,
-            small_blind=self.small_blind,
-            max_players=len(self.players),
-        )
-
-        # general info
-        game.num_hands = self.num_hands
-
-        # button and blinds
-        game.btn_loc = self.btn_loc
-        game.sb_loc = self.sb_loc
-        game.bb_loc = self.bb_loc
-
-        if not self.is_hand_running():
-            # read chips
-            for i in game.player_iter(0):
-                game.players[i].chips = self.players[i].chips
-            return game
-
-        # replay last hand
-
-        # set button location
-        game.btn_loc = next(self.player_iter(loc=self.btn_loc - 1, reverse=True))
-
-        # read chips
-        for i in game.player_iter(0):
-            game.players[i].chips = self.hand_history.prehand.player_chips[i]
-
-        # cards
-        deck = self._deck.copy(shuffle=shuffle)
-
-        # stack deck
-        if self.hand_history.settle:
-            deck.cards = list(self.hand_history.settle.new_cards) + deck.cards
-
-        # player actions in a stack
-        player_actions: List[Tuple[int, ActionType, Optional[int]]] = []
-        for bet_round in (
-            self.hand_history.river,
-            self.hand_history.turn,
-            self.hand_history.flop,
-            self.hand_history.preflop,
-        ):
-            if bet_round:
-                deck.cards = bet_round.new_cards + deck.cards
-                for action in reversed(bet_round.actions):
-                    player_actions.insert(
-                        0, (action.player_id, action.action_type, action.total)
-                    )
-
-        # start hand (deck will deal)
-        game.start_hand()
-
-        for i, cards in self.hands.items():
-            game.hands[i] = cards.copy()
-
-        # swap decks
-        game._deck = deck
-
-        while player_actions:
-            player_id, action, total = player_actions.pop(0)
-
-            if player_id != game.current_player:
-                raise ValueError(
-                    f"Unexpected error when copying: action player {player_id} "
-                    f"is not current player {game.current_player}"
-                )
-
-            game.take_action(action, total=total)
-
-        return game
-
-    def __copy__(self):
-        return self.copy(shuffle=False)
-
-    def __deepcopy__(self, memodict: dict = None):
-        memodict = memodict if memodict else {}
-        return self.copy(shuffle=False)
