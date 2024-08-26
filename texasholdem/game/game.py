@@ -254,7 +254,10 @@ class TexasHoldEm:
 
     """
 
-    def __init__(self, buyin: int, big_blind: int, small_blind: int, max_players=9):
+    def __init__(self, buyin: int, big_blind: int, small_blind: int, max_players=9, seed: Optional[int] = None):
+        # Local RNG
+        self._random = random.Random(seed)
+        
         self.buyin = buyin
         self.big_blind = big_blind
         self.small_blind = small_blind
@@ -299,6 +302,7 @@ class TexasHoldEm:
         
     def _save_state(self):
         assert self.hand_phase == HandPhase.PREHAND, self.hand_phase
+        assert self.num_hands > 0
         try:
             del self._initial_state
         except AttributeError:
@@ -928,7 +932,20 @@ class TexasHoldEm:
                 possible[ActionType.RAISE] = range(max_raise, max_raise + 1)
 
         return MoveIterator(possible)
-
+    
+    @versionadded(version="0.9.0")
+    def sample_random_action(self, no_fold: bool = False) -> Tuple[ActionType, Optional[int]]:
+        moves = self.get_available_moves()
+        if no_fold:
+            del moves[ActionType.FOLD]
+        action_type = self._random.choice(moves.action_types)
+        if ActionType.RAISE in moves:
+            total = self._random.choice(moves.raise_range)
+        else:
+            total = None
+        
+        return (action_type, total)
+    
     def _take_action(self, action: ActionType, total: Optional[int] = None):
         """
         Execute the action for the current player. Assumes the move is valid.
