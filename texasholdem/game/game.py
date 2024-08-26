@@ -17,6 +17,7 @@ from collections import deque
 from enum import Enum, auto
 import random
 import warnings
+import copy
 
 from deprecated.sphinx import versionadded, versionchanged
 
@@ -293,6 +294,64 @@ class TexasHoldEm:
         self.hand_history: Optional[History] = None
         self._action = None, None
         self._hand_gen = None
+        self._IGNORED_STATE_KEYS = ("_hand_gen", "_initial_state", "_handstate_handler")
+        self._initial_state = None
+        
+    def _save_state(self):
+        assert self.hand_phase == HandPhase.PREHAND, self.hand_phase
+        try:
+            del self._initial_state
+        except AttributeError:
+            pass
+        self._initial_state = {
+            key: copy.deepcopy(value)
+            if key not in self._IGNORED_STATE_KEYS
+            else None
+            for key, value in self.__dict__.items()
+        }
+        self._initial_state["actions"] = []
+    
+    def _save_action(self,
+                     action_type: ActionType,
+                     value: Optional[int] = None,
+                     total: Optional[int] = None):
+        self._initial_state["actions"].append(
+            dict(
+                action_type=action_type,
+                value=value,
+                total=total
+                )
+            )
+    
+    def __getstate__(self):
+        return self._initial_state
+    
+    def __setstate__(self, state):
+        actions = state.pop("actions")
+        self.__dict__.update(state)
+        self._handstate_handler = {
+            HandPhase.PREHAND: self._prehand,
+            HandPhase.PREFLOP: lambda: self._betting_round(HandPhase.PREFLOP),
+            HandPhase.FLOP: lambda: self._betting_round(HandPhase.FLOP),
+            HandPhase.TURN: lambda: self._betting_round(HandPhase.TURN),
+            HandPhase.RIVER: lambda: self._betting_round(HandPhase.RIVER),
+            HandPhase.SETTLE: self._settle,
+        }
+        self._save_state()
+
+        if self.game_state == GameState.STOPPED:
+            return
+        
+        self.hand_phase = self.hand_phase.next_phase()
+        self._hand_gen = self._hand_iter()
+
+        try:
+            next(self._hand_gen)
+        except StopIteration:
+            pass
+        
+        for action in actions:
+            self.take_action(**action)
 
     @property
     def action(self) -> Tuple[ActionType, Optional[int]]:
@@ -1074,6 +1133,7 @@ class TexasHoldEm:
 
         self.hand_phase = HandPhase.PREHAND
         self._handstate_handler[self.hand_phase]()
+        self._save_state()
 
         if self.game_state == GameState.STOPPED:
             return
@@ -1120,6 +1180,12 @@ class TexasHoldEm:
             raise ValueError(
                 "Got arguments for both total and value. Expected only one."
             )
+            
+        self._save_action(
+            action_type=action_type,
+            total=total,
+            value=value,
+        )
 
         if value:
             warnings.warn(
