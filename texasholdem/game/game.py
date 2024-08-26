@@ -403,7 +403,7 @@ class TexasHoldEm:
         self.pots = [Pot()]
 
         # deal cards
-        self._deck = Deck()
+        self._deck = Deck(self._random)
         self.hands = {}
         self.board = []
 
@@ -1325,7 +1325,7 @@ class TexasHoldEm:
             game.players[i].chips = history.prehand.player_chips[i]
 
         # stack deck
-        deck = Deck()
+        deck = Deck(game._random)
         deck.cards = list(history.settle.new_cards)
 
         # player actions in a stack

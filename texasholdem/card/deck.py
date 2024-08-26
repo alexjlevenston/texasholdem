@@ -16,7 +16,8 @@ class Deck:
 
     _FULL_DECK: List[Card] = []
 
-    def __init__(self):
+    def __init__(self, _random: random.Random):
+        self._random = _random
         self.cards = Deck._get_full_deck()
         self.shuffle()
 
@@ -25,7 +26,7 @@ class Deck:
         Shuffles the remaining cards in the deck.
 
         """
-        random.shuffle(self.cards)
+        self._random.shuffle(self.cards)
 
     def draw(self, num=1) -> List[Card]:
         """
