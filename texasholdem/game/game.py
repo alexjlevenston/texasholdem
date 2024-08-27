@@ -414,6 +414,7 @@ class TexasHoldEm:
             assert len(self._deck.cards) == 52, "Deck must have 52 cards"
         self.hands = {}
         self.board = []
+        original_cards = [card for card in self._deck.cards]
 
         for player_id in self.in_pot_iter(self.btn_loc + 1):
             self.hands[player_id] = self._deck.draw(num=2)
@@ -430,6 +431,7 @@ class TexasHoldEm:
                     i: self.players[i].chips for i in range(self.max_players)
                 },
                 player_cards=self.hands,
+                original_cards=original_cards,
             )
         )
 

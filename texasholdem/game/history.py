@@ -62,6 +62,10 @@ class PrehandHistory:
     """
     The cards for each player
     """
+    original_cards: List[Card]
+    """
+    The original cards in the deck
+    """
 
     def to_string(self, canon_ids: Dict[int, int]) -> str:
         """
@@ -121,6 +125,7 @@ class PrehandHistory:
             int(small_blind),
             dict(zip(range(num_players), player_chips)),
             dict(zip(range(num_players), player_cards)),
+            [],
         )
 
 
