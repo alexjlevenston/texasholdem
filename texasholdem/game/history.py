@@ -14,6 +14,7 @@ from typing import Optional, Union, Tuple, List, Dict
 from dataclasses import dataclass
 from pathlib import Path
 import os
+from collections import OrderedDict
 
 from texasholdem.game.action_type import ActionType
 from texasholdem.card.card import Card
@@ -66,6 +67,25 @@ class PrehandHistory:
     """
     The original cards in the deck
     """
+    
+    def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
+        """
+        Arguments:
+            canon_ids (Dict[int, int]): Map of old_id -> new_id where the new btn_loc is 0
+        Returns:
+            OrderedDict: The JSON representation of the prehand history
+
+        """
+        record = OrderedDict([
+            ("BigBlind", self.big_blind),
+            ("SmallBlind", self.small_blind),
+            ("PlayerChips", [self.player_chips[i] for i in canon_ids]),
+            ("PlayerCards", [
+                [str(card) for card in self.player_cards[i]]
+                for i in canon_ids
+            ]),
+        ])
+        return record
 
     def to_string(self, canon_ids: Dict[int, int]) -> str:
         """
@@ -152,6 +172,23 @@ class PlayerAction:
     """
     The amount raised
     """
+    
+    def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
+        """
+        Arguments:
+            canon_ids (Dict[int, int]): Map of old_id -> new_id where the new btn_loc is 0
+        Returns:
+            OrderedDict: The JSON representation of the player action
+
+        """
+        record = OrderedDict([
+            ("PlayerId", canon_ids[self.player_id]),
+            ("ActionType", self.action_type.name),
+        ])
+        
+        if self.total is not None and self.total > 0:
+            record["Total"] = self.total
+        return record
 
     def to_string(self, canon_ids: Dict[int, int]) -> str:
         """
@@ -205,6 +242,20 @@ class BettingRoundHistory:
     """
     A list of PlayerActions
     """
+    
+    def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
+        """
+        Arguments:
+            canon_ids (Dict[int, int]): Map of old_id -> new_id where the new btn_loc is 0
+        Returns:
+            OrderedDict: The JSON representation of the betting round history
+
+        """
+        record = OrderedDict()
+        if len(self.new_cards) > 0:
+            record["NewCards"] = [str(card) for card in self.new_cards]
+        record["Actions"] = [action.to_json(canon_ids) for action in self.actions]
+        return record
 
     def to_string(self, canon_ids: Dict[int, int]) -> str:
         """
@@ -284,6 +335,29 @@ class SettleHistory:
     """
     The number of chips for each player
     """
+    
+    def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
+        """
+        Arguments:
+            canon_ids (Dict[int, int]): Map of old_id -> new_id where the new btn_loc is 0
+        Returns:
+            OrderedDict: The JSON representation of the settle history
+
+        """
+        record = OrderedDict()
+        if len(self.new_cards) > 0:
+            record["NewCards"] = [str(card) for card in self.new_cards]
+        record["Winners"] = [
+            OrderedDict([
+                ("PotId", pot_id),
+                ("Amount", amount),
+                ("BestRank", best_rank),
+                ("Winners", [canon_ids[winner] for winner in winners_list]),
+            ])
+            for pot_id, (amount, best_rank, winners_list) in self.pot_winners.items()
+        ]
+        record["PlayerChips"] = [self.player_chips[i] for i in canon_ids]
+        return record
 
     def to_string(self, canon_ids: Dict[int, int]) -> str:
         """
@@ -407,6 +481,30 @@ class History:
     """
     The River History
     """
+    
+    def to_json(self) -> OrderedDict:
+        num_players = len(self.prehand.player_chips)
+        old_ids = [
+            i % num_players
+            for i in range(self.prehand.btn_loc, self.prehand.btn_loc + num_players)
+            if self.prehand.player_chips[i % num_players] > 0
+        ]
+        canon_ids = dict(zip(old_ids, range(len(old_ids))))
+        
+        record = OrderedDict()
+        
+        for history_item, name in [
+            (self.prehand, HandPhase.PREHAND.name),
+            (self.preflop, HandPhase.PREFLOP.name),
+            (self.flop, HandPhase.FLOP.name),
+            (self.turn, HandPhase.TURN.name),
+            (self.river, HandPhase.RIVER.name),
+            (self.settle, HandPhase.SETTLE.name),
+        ]:
+            if history_item is not None:
+                record[name.upper()] = history_item.to_json(canon_ids)
+        
+        return record
 
     def to_string(self) -> str:
         """
