@@ -653,7 +653,7 @@ class TexasHoldEm:
         if self.hand_phase != HandPhase.SETTLE:
             raise ValueError("Not time for Settle!")
 
-        settle_history = SettleHistory(new_cards=[], pot_winners={})
+        settle_history = SettleHistory(new_cards=[], pot_winners={}, player_chips={})
         self.hand_history[HandPhase.SETTLE] = settle_history
 
         self.current_player = next(self.in_pot_iter(loc=self.btn_loc + 1))
@@ -702,6 +702,11 @@ class TexasHoldEm:
                     if j in winners:
                         self.players[j].chips += leftover
                         break
+        
+        settle_history.player_chips = {
+            i: self.players[i].chips
+            for i in range(self.max_players)
+        }
 
     def chips_to_call(self, player_id: int) -> int:
         """

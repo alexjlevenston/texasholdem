@@ -280,6 +280,10 @@ class SettleHistory:
     """
     A map from pot_id to a tuple of winner data :code:`amount, best rank, list of winners`
     """
+    player_chips: Dict[int, int]
+    """
+    The number of chips for each player
+    """
 
     def to_string(self, canon_ids: Dict[int, int]) -> str:
         """
