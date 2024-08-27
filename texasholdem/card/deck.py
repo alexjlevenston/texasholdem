@@ -74,7 +74,7 @@ class Deck:
            Deck: A copy of the deck
 
         """
-        deck = Deck()
+        deck = Deck(self._random)
         deck.cards = self.cards.copy()
         if shuffle:
             deck.shuffle()

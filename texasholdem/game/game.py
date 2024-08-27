@@ -256,7 +256,7 @@ class TexasHoldEm:
                  big_blind: int,
                  small_blind: int,
                  player_chips: List[int],
-                 cards: List[Card],
+                 cards: Optional[List[Card]] = None,
                  seed: Optional[int] = None):
         # Local RNG
         self._random = random.Random(seed)
@@ -276,8 +276,9 @@ class TexasHoldEm:
 
         self.pots = []
         self._deck = Deck(self._random)
-        assert len(cards) == 52, "Deck must have 52 cards"
-        self._deck.cards = [copy.deepcopy(card) for card in cards]
+        if cards is not None:
+            assert len(cards) == 52, "Deck must have 52 cards"
+            self._deck.cards = [copy.deepcopy(card) for card in cards]
         self.board = []
         self.hands = {}
         self.last_raise = 0
