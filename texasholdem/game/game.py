@@ -307,7 +307,6 @@ class TexasHoldEm:
         
     def _save_state(self):
         assert self.hand_phase == HandPhase.PREHAND, self.hand_phase
-        assert self.num_hands > 0
         try:
             del self._initial_state
         except AttributeError:
@@ -346,21 +345,26 @@ class TexasHoldEm:
             HandPhase.RIVER: lambda: self._betting_round(HandPhase.RIVER),
             HandPhase.SETTLE: self._settle,
         }
-        self._save_state()
+        if len(self.hands) > 0:
+            self._save_state()
 
-        if self.game_state == GameState.STOPPED:
-            return
-        
-        self.hand_phase = self.hand_phase.next_phase()
-        self._hand_gen = self._hand_iter()
+            if self.game_state == GameState.STOPPED:
+                return
+            
+            self.hand_phase = self.hand_phase.next_phase()
+            self._hand_gen = self._hand_iter()
 
-        try:
-            next(self._hand_gen)
-        except StopIteration:
-            pass
+            try:
+                next(self._hand_gen)
+            except StopIteration:
+                pass
+            
+            for action in actions:
+                self.take_action(**action)
+        else:
+            assert len(actions) == 0
+            assert self.hand_phase == HandPhase.PREHAND
         
-        for action in actions:
-            self.take_action(**action)
 
     @property
     def action(self) -> Tuple[ActionType, Optional[int]]:
