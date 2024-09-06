@@ -10,7 +10,7 @@ Texas Hold Em Notation Conventions:
 
 """
 from __future__ import annotations
-from typing import Optional, Union, Tuple, List, Dict
+from typing import Optional, Union, Tuple, List, Dict, Any
 from dataclasses import dataclass
 from pathlib import Path
 import os
@@ -68,6 +68,9 @@ class PrehandHistory:
     The original cards in the deck
     """
     
+    def to_tokenizable(self, canon_ids: Dict[int, int]) -> str:
+        return f"""BigBlind {self.big_blind} SmallBlind {self.small_blind} PlayerChips {' '.join([str(self.player_chips[i]) for i in canon_ids])} PlayerCards {' '.join([' '.join([str(card) for card in self.player_cards[i]]) for i in canon_ids])}"""
+
     def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
         """
         Arguments:
@@ -173,6 +176,12 @@ class PlayerAction:
     The amount raised
     """
     
+    def to_tokenizable(self, canon_ids: Dict[int, int]) -> str:
+        if self.action_type == ActionType.RAISE:
+            return f"""PlayerId {canon_ids[self.player_id]} ActionType {self.action_type.name} Total {self.total}"""
+        else:
+            return f"""PlayerId {canon_ids[self.player_id]} ActionType {self.action_type.name}"""
+    
     def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
         """
         Arguments:
@@ -242,6 +251,13 @@ class BettingRoundHistory:
     """
     A list of PlayerActions
     """
+    
+    def to_tokenizable(self, canon_ids: Dict[int, int]) -> str:
+        string = ""
+        if len(self.new_cards) > 0:
+            string += f"""NewCards {' '.join([str(card) for card in self.new_cards])} """
+        string += "Actions " + " ".join(action.to_tokenizable(canon_ids) for action in self.actions)
+        return string
     
     def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
         """
@@ -335,6 +351,18 @@ class SettleHistory:
     """
     The number of chips for each player
     """
+    
+    @staticmethod
+    def winner_to_tokenizable(pot_id, amount, best_rank, winners_list, canon_ids):
+        return f"""PotId {pot_id} Amount {amount} BestRank {best_rank} Winners {' '.join([str(canon_ids[winner]) for winner in winners_list])}"""
+    
+    def to_tokenizable(self, canon_ids: Dict[int, int]) -> str:
+        string = ""
+        if len(self.new_cards) > 0:
+            string += f"""NewCards {' '.join([str(card) for card in self.new_cards])} """
+        string += "Winners " + " ".join(self.winner_to_tokenizable(pot_id, amount, best_rank, winners_list, canon_ids) for pot_id, (amount, best_rank, winners_list) in self.pot_winners.items()) + " "
+        string += f"PlayerChips {' '.join([str(self.player_chips[i]) for i in canon_ids])}"
+        return string
     
     def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
         """
@@ -481,6 +509,32 @@ class History:
     """
     The River History
     """
+    
+    def to_tokenizable(self) -> str:
+        num_players = len(self.prehand.player_chips)
+        old_ids = [
+            i % num_players
+            for i in range(self.prehand.btn_loc, self.prehand.btn_loc + num_players)
+            if self.prehand.player_chips[i % num_players] > 0
+        ]
+        canon_ids = dict(zip(old_ids, range(len(old_ids))))
+        
+        string = ""
+        
+        for history_item, name in [
+            (self.prehand, HandPhase.PREHAND.name),
+            (self.preflop, HandPhase.PREFLOP.name),
+            (self.flop, HandPhase.FLOP.name),
+            (self.turn, HandPhase.TURN.name),
+            (self.river, HandPhase.RIVER.name),
+            (self.settle, HandPhase.SETTLE.name),
+        ]:
+            if history_item is not None:
+                if name != HandPhase.PREHAND.name:
+                    string += " "
+                string += f"{name.upper()[0] + name.lower()[1:]} " + history_item.to_tokenizable(canon_ids).strip()
+        
+        return string.replace(", ", ",")
     
     def to_json(self) -> OrderedDict:
         num_players = len(self.prehand.player_chips)
