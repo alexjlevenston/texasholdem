@@ -186,7 +186,7 @@ class PlayerAction:
             ("ActionType", self.action_type.name),
         ])
         
-        if self.total is not None and self.total > 0:
+        if self.action_type == ActionType.RAISE:
             record["Total"] = self.total
         return record
 
@@ -198,7 +198,7 @@ class PlayerAction:
             str: The string representation of a player action: id, action, amount
         """
         string = f"({canon_ids[self.player_id]},{self.action_type.name}"
-        if self.total is not None and self.total > 0:
+        if self.action_type == ActionType.RAISE:
             string += "," + str(self.total)
         string += ")"
 
