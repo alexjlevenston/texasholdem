@@ -69,7 +69,7 @@ class PrehandHistory:
     """
     
     def to_tokenizable(self, canon_ids: Dict[int, int]) -> str:
-        return f"""BigBlind {self.big_blind} SmallBlind {self.small_blind} PlayerChips {' '.join([str(self.player_chips[i]) for i in canon_ids])} PlayerCards {' '.join([' '.join([str(card) for card in self.player_cards[i]]) for i in canon_ids])}"""
+        return f"""BigBlind {self.big_blind} SmallBlind {self.small_blind} PlayerIds {' '.join([str(canon_ids[i]) for i in canon_ids])} PlayerChips {' '.join([str(self.player_chips[i]) for i in canon_ids])} PlayerCards {' '.join([' '.join([str(card) for card in self.player_cards[i]]) for i in canon_ids])}"""
 
     def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
         """
