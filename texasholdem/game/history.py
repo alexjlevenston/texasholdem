@@ -534,7 +534,7 @@ class History:
                     string += " "
                 string += f"{name.upper()[0] + name.lower()[1:]} " + history_item.to_tokenizable(canon_ids).strip()
         
-        return string.replace(", ", ",")
+        return string
     
     def to_json(self) -> OrderedDict:
         num_players = len(self.prehand.player_chips)
