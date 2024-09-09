@@ -69,7 +69,13 @@ class PrehandHistory:
     """
     
     def to_tokenizable(self, canon_ids: Dict[int, int]) -> str:
-        return f"""BigBlind {self.big_blind} SmallBlind {self.small_blind} PlayerIds {' '.join([str(canon_ids[i]) for i in canon_ids])} PlayerChips {', '.join([str(self.player_chips[i]) for i in canon_ids])} PlayerCards {' '.join([' '.join([str(card) for card in self.player_cards[i]]) for i in canon_ids])}"""
+        string = ""
+        string += f"BigBlind {self.big_blind}"
+        string += f" SmallBlind {self.small_blind}"
+        string += f" PlayerIds {' '.join([str(canon_ids[i]) for i in canon_ids])}"
+        string += f" PlayerChips {' '.join([str(self.player_chips[i]) for i in canon_ids])}"
+        string += f" PlayerCards {' '.join([' '.join([str(card) for card in self.player_cards[i]]) for i in canon_ids])}"
+        return string
 
     def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
         """
@@ -177,10 +183,10 @@ class PlayerAction:
     """
     
     def to_tokenizable(self, canon_ids: Dict[int, int]) -> str:
+        string = f"PlayerId {canon_ids[self.player_id]} ActionType {self.action_type.name}"
         if self.action_type == ActionType.RAISE:
-            return f"""PlayerId {canon_ids[self.player_id]} ActionType {self.action_type.name} Total {self.total}"""
-        else:
-            return f"""PlayerId {canon_ids[self.player_id]} ActionType {self.action_type.name}"""
+            string += f" Total {self.total}"
+        return string
     
     def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
         """
@@ -255,7 +261,7 @@ class BettingRoundHistory:
     def to_tokenizable(self, canon_ids: Dict[int, int]) -> str:
         string = ""
         if len(self.new_cards) > 0:
-            string += f"""NewCards {' '.join([str(card) for card in self.new_cards])} """
+            string += f"NewCards {' '.join([str(card) for card in self.new_cards])} "
         string += "Actions " + " ".join(action.to_tokenizable(canon_ids) for action in self.actions)
         return string
     
@@ -359,9 +365,9 @@ class SettleHistory:
     def to_tokenizable(self, canon_ids: Dict[int, int]) -> str:
         string = ""
         if len(self.new_cards) > 0:
-            string += f"""NewCards {' '.join([str(card) for card in self.new_cards])} """
-        string += "Winners " + " ".join(self.winner_to_tokenizable(pot_id, amount, best_rank, winners_list, canon_ids) for pot_id, (amount, best_rank, winners_list) in self.pot_winners.items()) + " "
-        string += f"PlayerChips {', '.join([str(self.player_chips[i]) for i in canon_ids])}"
+            string += f"NewCards {' '.join([str(card) for card in self.new_cards])} "
+        string += "Pots " + " ".join(self.winner_to_tokenizable(pot_id, amount, best_rank, winners_list, canon_ids) for pot_id, (amount, best_rank, winners_list) in self.pot_winners.items()) + " "
+        string += f"PlayerChips {' '.join([str(self.player_chips[i]) for i in canon_ids])}"
         return string
     
     def to_json(self, canon_ids: Dict[int, int]) -> OrderedDict:
