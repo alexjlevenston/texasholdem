@@ -958,7 +958,7 @@ class TexasHoldEm:
         if no_fold:
             del moves[ActionType.FOLD]
         action_type = self._random.choice(moves.action_types)
-        if ActionType.RAISE in moves:
+        if action_type == ActionType.RAISE:
             total = self._random.choice(moves.raise_range)
         else:
             total = None
